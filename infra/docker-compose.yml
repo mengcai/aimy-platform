@@ -1,0 +1,330 @@
+version: '3.8'
+
+services:
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: aimy-postgres
+    environment:
+      POSTGRES_DB: aimy
+      POSTGRES_USER: aimy
+      POSTGRES_PASSWORD: aimy123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - aimy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aimy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and queues
+  redis:
+    image: redis:7-alpine
+    container_name: aimy-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - aimy-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO for object storage
+  minio:
+    image: minio/minio:latest
+    container_name: aimy-minio
+    environment:
+      MINIO_ROOT_USER: aimy
+      MINIO_ROOT_PASSWORD: aimy123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - aimy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Kafka for message bus
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: aimy-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - aimy-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: aimy-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    networks:
+      - aimy-network
+
+  # Blockchain node (local development)
+  ganache:
+    image: trufflesuite/ganache-cli:latest
+    container_name: aimy-ganache
+    ports:
+      - "8545:8545"
+    command: >
+      --deterministic
+      --accounts 10
+      --defaultBalanceEther 1000
+      --gasLimit 8000000
+      --networkId 1337
+    networks:
+      - aimy-network
+
+  # AI Core Service (Python FastAPI)
+  ai-core:
+    build:
+      context: ../services/ai-core
+      dockerfile: Dockerfile
+    container_name: aimy-ai-core
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://aimy:aimy123@postgres:5432/aimy
+      - REDIS_URL=redis://redis:6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=aimy
+      - MINIO_SECRET_KEY=aimy123
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - aimy-network
+    volumes:
+      - ../services/ai-core:/app
+      - /app/node_modules
+
+  # Compliance Service (NestJS)
+  compliance:
+    build:
+      context: ../services/compliance
+      dockerfile: Dockerfile
+    container_name: aimy-compliance
+    ports:
+      - "8001:3000"
+    environment:
+      - DATABASE_URL=postgresql://aimy:aimy123@postgres:5432/aimy
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - aimy-network
+    volumes:
+      - ../services/compliance:/app
+      - /app/node_modules
+
+  # Settlement Service (NestJS)
+  settlement:
+    build:
+      context: ../services/settlement
+      dockerfile: Dockerfile
+    container_name: aimy-settlement
+    ports:
+      - "8002:3000"
+    environment:
+      - DATABASE_URL=postgresql://aimy:aimy123@postgres:5432/aimy
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - WISE_API_KEY=${WISE_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - aimy-network
+    volumes:
+      - ../services/settlement:/app
+      - /app/node_modules
+
+  # Liquidity Service (NestJS)
+  liquidity:
+    build:
+      context: ../services/liquidity
+      dockerfile: Dockerfile
+    container_name: aimy-liquidity
+    ports:
+      - "8003:3000"
+    environment:
+      - DATABASE_URL=postgresql://aimy:aimy123@postgres:5432/aimy
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+      - BINANCE_API_KEY=${BINANCE_API_KEY}
+      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - aimy-network
+    volumes:
+      - ../services/liquidity:/app
+      - /app/node_modules
+
+  # API Gateway (NestJS)
+  gateway:
+    build:
+      context: ../apps/gateway
+      dockerfile: Dockerfile
+    container_name: aimy-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://aimy:aimy123@postgres:5432/aimy
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+      - AI_SERVICE_URL=http://ai-core:8000
+      - COMPLIANCE_SERVICE_URL=http://compliance:3000
+      - SETTLEMENT_SERVICE_URL=http://settlement:3000
+      - LIQUIDITY_SERVICE_URL=http://liquidity:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      ai-core:
+        condition: service_started
+      compliance:
+        condition: service_started
+      settlement:
+        condition: service_started
+      liquidity:
+        condition: service_started
+    networks:
+      - aimy-network
+    volumes:
+      - ../apps/gateway:/app
+      - /app/node_modules
+
+  # Web App (Next.js)
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    container_name: aimy-web
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+      - NEXT_PUBLIC_APP_URL=http://localhost:3001
+    depends_on:
+      - gateway
+    networks:
+      - aimy-network
+    volumes:
+      - ../apps/web:/app
+      - /app/node_modules
+      - /app/.next
+
+  # Console App (Next.js)
+  console:
+    build:
+      context: ../apps/console
+      dockerfile: Dockerfile
+    container_name: aimy-console
+    ports:
+      - "3002:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+      - NEXT_PUBLIC_APP_URL=http://localhost:3002
+    depends_on:
+      - gateway
+    networks:
+      - aimy-network
+    volumes:
+      - ../apps/console:/app
+      - /app/node_modules
+      - /app/.next
+
+  # Monitoring and Observability
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aimy-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - aimy-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aimy-grafana
+    ports:
+      - "3003:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - aimy-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  aimy-network:
+    driver: bridge

@@ -1,0 +1,19 @@
+{
+  "name": "aimy-infra",
+  "version": "0.1.0",
+  "description": "Infrastructure and deployment scripts for AIMY platform",
+  "scripts": {
+    "seed": "tsx seed.ts",
+    "db:reset": "tsx scripts/reset-db.ts",
+    "db:migrate": "tsx scripts/migrate.ts"
+  },
+  "dependencies": {
+    "pg": "^8.11.0",
+    "tsx": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.10.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}

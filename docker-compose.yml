@@ -1,0 +1,307 @@
+version: '3.8'
+
+services:
+  # Database Layer
+  postgres:
+    image: postgres:15-alpine
+    container_name: aimy-postgres
+    environment:
+      POSTGRES_DB: aimy
+      POSTGRES_USER: aimy_user
+      POSTGRES_PASSWORD: aimy_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aimy_user -d aimy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aimy-network
+
+  # Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: aimy-redis
+    command: redis-server --appendonly yes --requirepass aimy_redis_password
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - aimy-network
+
+  # Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: aimy-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: aimy_minio_user
+      MINIO_ROOT_PASSWORD: aimy_minio_password
+      MINIO_DOMAIN: minio.local
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - aimy-network
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aimy-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - aimy-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aimy-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: aimy_admin_password
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - aimy-network
+
+  # Backend Services
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    container_name: aimy-gateway
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://aimy_user:aimy_password@postgres:5432/aimy
+      REDIS_URL: redis://:aimy_redis_password@redis:6379
+      JWT_SECRET: aimy_jwt_secret_key_development
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - aimy-network
+
+  compliance:
+    build:
+      context: ./services/compliance
+      dockerfile: Dockerfile
+    container_name: aimy-compliance
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://aimy_user:aimy_password@postgres:5432/aimy
+      REDIS_URL: redis://:aimy_redis_password@redis:6379
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: aimy_minio_user
+      MINIO_SECRET_KEY: aimy_minio_password
+      MINIO_BUCKET: compliance-documents
+      PORT: 3002
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - aimy-network
+
+  settlement:
+    build:
+      context: ./services/settlement
+      dockerfile: Dockerfile
+    container_name: aimy-settlement
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://aimy_user:aimy_password@postgres:5432/aimy
+      REDIS_URL: redis://:aimy_redis_password@redis:6379
+      PORT: 3003
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - aimy-network
+
+  liquidity:
+    build:
+      context: ./services/liquidity
+      dockerfile: Dockerfile
+    container_name: aimy-liquidity
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://aimy_user:aimy_password@postgres:5432/aimy
+      REDIS_URL: redis://:aimy_redis_password@redis:6379
+      PORT: 3004
+    ports:
+      - "3004:3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - aimy-network
+
+  ai-core:
+    build:
+      context: ./services/ai-core
+      dockerfile: Dockerfile
+    container_name: aimy-ai-core
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql://aimy_user:aimy_password@postgres:5432/aimy
+      REDIS_URL: redis://:aimy_redis_password@redis:6379
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: aimy_minio_user
+      MINIO_SECRET_KEY: aimy_minio_password
+      MINIO_BUCKET: ai-models
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - aimy-network
+
+  # Frontend Applications
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: aimy-web
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_AI_SERVICE_URL: http://localhost:8000
+      NEXT_PUBLIC_COMPLIANCE_URL: http://localhost:3002
+      NEXT_PUBLIC_SETTLEMENT_URL: http://localhost:3003
+      NEXT_PUBLIC_LIQUIDITY_URL: http://localhost:3004
+    ports:
+      - "3005:3000"
+    depends_on:
+      - gateway
+      - ai-core
+      - compliance
+      - settlement
+      - liquidity
+    networks:
+      - aimy-network
+
+  console:
+    build:
+      context: ./apps/console
+      dockerfile: Dockerfile
+    container_name: aimy-console
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_COMPLIANCE_URL: http://localhost:3002
+      NEXT_PUBLIC_SETTLEMENT_URL: http://localhost:3003
+    ports:
+      - "3006:3000"
+    depends_on:
+      - gateway
+      - compliance
+      - settlement
+    networks:
+      - aimy-network
+
+  # Development Tools
+  adminer:
+    image: adminer:latest
+    container_name: aimy-adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - aimy-network
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: aimy-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:aimy_redis_password
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - aimy-network
+
+  # Blockchain Development
+  hardhat:
+    image: node:20-alpine
+    container_name: aimy-hardhat
+    working_dir: /app
+    volumes:
+      - ./packages/contracts:/app
+    command: sh -c "npm install && npm run node"
+    ports:
+      - "8545:8545"
+    networks:
+      - aimy-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  aimy-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

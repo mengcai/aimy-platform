@@ -1,0 +1,27 @@
+{
+  "name": "aimy-scripts",
+  "version": "1.0.0",
+  "description": "AIMY Platform utility scripts and tools",
+  "main": "index.js",
+  "scripts": {
+    "por": "node generate-por.js",
+    "por:schedule": "node generate-por.js --schedule",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "dependencies": {
+    "pg": "^8.11.3",
+    "ethers": "^5.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "keywords": [
+    "aimy",
+    "proof-of-reserve",
+    "blockchain",
+    "tokenization",
+    "compliance"
+  ],
+  "author": "AIMY Platform Team",
+  "license": "MIT"
+}

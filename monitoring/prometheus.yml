@@ -1,0 +1,94 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # AIMY API Gateway
+  - job_name: 'aimy-gateway'
+    static_configs:
+      - targets: ['gateway:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # AIMY AI Core Service
+  - job_name: 'aimy-ai-core'
+    static_configs:
+      - targets: ['ai-core:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # AIMY Compliance Service
+  - job_name: 'aimy-compliance'
+    static_configs:
+      - targets: ['compliance:3001']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # AIMY Settlement Service
+  - job_name: 'aimy-settlement'
+    static_configs:
+      - targets: ['settlement:3002']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # AIMY Liquidity Service
+  - job_name: 'aimy-liquidity'
+    static_configs:
+      - targets: ['liquidity:3003']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # AIMY Web Application
+  - job_name: 'aimy-web'
+    static_configs:
+      - targets: ['web:3000']
+    metrics_path: '/api/metrics'
+    scrape_interval: 15s
+
+  # AIMY Console Application
+  - job_name: 'aimy-console'
+    static_configs:
+      - targets: ['console:3001']
+    metrics_path: '/api/metrics'
+    scrape_interval: 15s
+
+  # PostgreSQL
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Kafka
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka:9092']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Node Exporter (if needed)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s

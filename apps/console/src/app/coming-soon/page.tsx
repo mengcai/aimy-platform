@@ -12,9 +12,8 @@ export default function ComingSoonPage() {
   });
 
   useEffect(() => {
-    // Set target date to 30 days from now
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + 30);
+    // Set target date to December 1, 2025
+    const targetDate = new Date('2025-12-01T00:00:00');
 
     const timer = setInterval(() => {
       const now = new Date().getTime();
@@ -82,7 +81,7 @@ export default function ComingSoonPage() {
 
             <div className="inline-flex items-center px-6 py-3 bg-yellow-50 border border-yellow-200 rounded-full text-yellow-800 text-sm font-medium">
               <Clock className="h-4 w-4 mr-2" />
-              Expected Launch: Q1 2025
+              Expected Launch: Q4 2025
             </div>
           </div>
 

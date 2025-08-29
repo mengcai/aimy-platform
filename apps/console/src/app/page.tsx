@@ -176,7 +176,7 @@ export default function HomePage() {
       
     } catch (error) {
       setSubmitStatus('error');
-      setSubmitMessage('Sorry, there was an error sending your message. Please try again or contact us directly at support@aimya.com');
+              setSubmitMessage('Sorry, there was an error sending your message. Please try again or contact us directly at support@aimya.ai');
       console.error('Contact form error:', error);
     } finally {
       setIsSubmitting(false);
@@ -1756,7 +1756,7 @@ export default function HomePage() {
               <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent"> Investment Journey?</span>
             </h2>
             <p className="text-xl text-blue-100 max-w-4xl mx-auto leading-relaxed">
-              Have questions about our platform or need assistance with your investments? Our dedicated team is ready to help. 
+              Have questions about our platform or need assistance with your investments? Our dedicated support team at <span className="font-semibold text-blue-300">support@aimya.ai</span> is ready to help. 
               Get personalized support and expert guidance to maximize your investment potential.
             </p>
           </div>
@@ -1783,7 +1783,7 @@ export default function HomePage() {
                     </div>
                     <div>
                       <h4 className="font-semibold text-gray-900 mb-1">Email Support</h4>
-                      <p className="text-gray-600">support@aimya.com</p>
+                      <p className="text-gray-600">support@aimya.ai</p>
                       <p className="text-sm text-gray-500">We typically respond within 24 hours</p>
                     </div>
                   </div>
@@ -2103,7 +2103,7 @@ export default function HomePage() {
                 <p className="text-sm mt-2">Empowering investors through AI and blockchain technology</p>
               </div>
               <div className="flex space-x-8">
-                <a href="/contact" className="text-gray-400 hover:text-white transition-colors text-sm font-medium">
+                <a href="#contact" className="text-gray-400 hover:text-white transition-colors text-sm font-medium">
                   Contact Us
                 </a>
                 <a href="/terms" className="text-gray-400 hover:text-white transition-colors text-sm font-medium">

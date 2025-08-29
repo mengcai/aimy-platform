@@ -86,5 +86,5 @@ export class EmailService {
 // Default email service configuration
 export const defaultEmailService = new EmailService({
   provider: 'console', // Change to 'sendgrid', 'mailgun', or 'nodemailer' for production
-  toEmail: 'cal.ericcai@gmail.com'
+  toEmail: 'support@aimya.ai'
 });

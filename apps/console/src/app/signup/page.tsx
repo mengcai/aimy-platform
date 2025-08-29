@@ -35,8 +35,8 @@ export default function SignupPage() {
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     // In a real app, this would create the account
-    // For demo purposes, we'll redirect to the private dashboard
-    window.location.href = 'http://localhost:3005/dashboard';
+    // For now, redirect to the coming soon page
+    window.location.href = '/coming-soon';
   };
 
   const nextStep = () => {
@@ -61,7 +61,7 @@ export default function SignupPage() {
           Create your account
         </h2>
         <p className="text-gray-600 mb-8">
-          Join AIMYA platform and start investing in real-world assets
+          Join AIMYA platform - coming soon! Be among the first to access our AI-powered investment platform
         </p>
       </div>
 

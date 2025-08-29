@@ -19,8 +19,8 @@ export default function LoginPage() {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // In a real app, this would validate credentials and get a token
-    // For demo purposes, we'll redirect to the private dashboard
-    window.location.href = 'http://localhost:3005/dashboard';
+    // For now, redirect to the coming soon page
+    window.location.href = '/coming-soon';
   };
 
   return (
@@ -150,7 +150,7 @@ export default function LoginPage() {
               <div className="text-xs text-gray-500 space-y-1">
                 <p><strong>Email:</strong> demo@aimya.com</p>
                 <p><strong>Password:</strong> demo123</p>
-                <p className="text-blue-600">Click "Sign in" to access your portfolio</p>
+                <p className="text-blue-600">Click "Sign in" to see the coming soon page</p>
               </div>
             </div>
           </div>
